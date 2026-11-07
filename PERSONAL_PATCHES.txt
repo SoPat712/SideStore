@@ -1,0 +1,42 @@
+Personal SideStore build
+
+Base: official SideStore 0.7.0-alpha, commit
+6032424a0e56c1c319762e786099bdd9186a238b.
+SideSign base: a731c0d5a9a6617c7b385ae493e07ffb7f81cd5d.
+
+This branch keeps the official release bundle identifiers, App Group names,
+keychain service, source feed, and Core Data model. Use a Release build.
+Debug builds use another bundle identifier and therefore another container.
+
+Authentication changes include official SideSign's pushed-code handling,
+JSON SMS challenge/verification, fresh anisette data across 2FA, updated
+request headers, an ephemeral HTTP session, and redacted auth diagnostics.
+These protocol changes require a real-device Apple sign-in test; a successful
+compile or fixture test does not establish compatibility with Apple's servers.
+
+Local build (Xcode and Homebrew ldid required):
+  git submodule update --init --recursive
+  xcodebuild -resolvePackageDependencies -project AltStore.xcodeproj \
+    -scheme SideStore -clonedSourcePackagesDirPath ../build/SideStoreSourcePackages
+  bash scripts/personal-build.sh ../build
+
+The generated IPA is prepared for re-signing. It is not signed with an Apple
+identity and cannot be installed directly. Keep personal keys, profiles,
+pairing files, account data, and backups outside this repository.
+
+Switching to a future official stable build:
+  1. Back up SideStore's app sandbox AND shared App Group container, including
+     the database/WAL/SHM files and cached Apps directory. Preserve credentials
+     separately; a container export does not capture the keychain.
+  2. Compare the final re-signed app and all extensions: same developer Team,
+     bundle identifiers, App Groups, default keychain access group, and
+     ALTBundleIdentifier/ALTAppGroups metadata. Check the database model is a
+     forward-compatible update. A matching unsigned IPA identifier is not enough.
+  3. Install as an update without deleting or offloading SideStore. Verify
+     sources, installed apps, refresh, and keychain access before discarding backups.
+
+Normal background refresh renews provisioning without replacing the binary.
+An explicit SideStore self-update can replace this patch with the official
+source build. Do that only after reviewing the official fix and compatibility.
+Same-team updates normally preserve containers; no unreleased stable version
+can be guaranteed to preserve every kind of data without checking it first.
