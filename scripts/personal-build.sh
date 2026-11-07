@@ -6,7 +6,7 @@ repo_dir="$(cd "$(dirname "$0")/.." && pwd)"
 work_dir="${1:-$repo_dir/../build}"
 mkdir -p "$work_dir"
 work_dir="$(cd "$work_dir" && pwd)"
-for program in xcodebuild ldid ditto unzip shasum; do
+for program in xcodebuild ldid ditto unzip shasum python3; do
     command -v "$program" >/dev/null || { echo "Missing build dependency: $program" >&2; exit 1; }
 done
 
@@ -33,7 +33,19 @@ ldid -SAltStore/Resources/ReleaseEntitlements.plist "$app/SideStore"
 ldid -SAltWidget/Resources/ReleaseEntitlements.plist "$app/PlugIns/AltWidgetExtension.appex/AltWidgetExtension"
 mkdir -p "$stage/sidebackup"
 unzip -q "$app/SideBackup.ipa" -d "$stage/sidebackup"
-ldid -SSideBackup/SideBackup.entitlements "$stage/sidebackup/Payload/SideBackup.app/SideBackup"
+python3 - "$app/Info.plist" "$repo_dir/SideBackup/SideBackup.entitlements" "$stage/sidebackup-entitlements.plist" <<'PY'
+import plistlib
+import sys
+with open(sys.argv[1], 'rb') as source:
+    bundle_id = plistlib.load(source)['CFBundleIdentifier']
+with open(sys.argv[2], 'rb') as source:
+    entitlements = plistlib.load(source)
+key = 'com.apple.security.application-groups'
+entitlements[key] = [value.replace('$(APP_GROUP_IDENTIFIER)', bundle_id) for value in entitlements[key]]
+with open(sys.argv[3], 'wb') as output:
+    plistlib.dump(entitlements, output)
+PY
+ldid -S"$stage/sidebackup-entitlements.plist" "$stage/sidebackup/Payload/SideBackup.app/SideBackup"
 rm "$app/SideBackup.ipa"
 ditto -c -k --keepParent "$stage/sidebackup/Payload" "$app/SideBackup.ipa"
 ditto -c -k --keepParent "$stage/Payload" "$stage/SideStore-personal.ipa"
