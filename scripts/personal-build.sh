@@ -25,7 +25,7 @@ stage="$(mktemp -d "$work_dir/ipa-stage.XXXXXX")"
 trap 'rm -rf "$stage"' EXIT
 mkdir -p "$stage/Payload"
 app="$stage/Payload/SideStore.app"
-ditto "$archive/Products/Applications/SideStore.app" "$app"
+ditto --norsrc --noextattr --noqtn --noacl "$archive/Products/Applications/SideStore.app" "$app"
 
 # Same entitlement-preserving preparation as the official Makefile.
 # A real development identity and profiles are still required to install it.
@@ -47,7 +47,24 @@ with open(sys.argv[3], 'wb') as output:
 PY
 ldid -S"$stage/sidebackup-entitlements.plist" "$stage/sidebackup/Payload/SideBackup.app/SideBackup"
 rm "$app/SideBackup.ipa"
-ditto -c -k --keepParent "$stage/sidebackup/Payload" "$app/SideBackup.ipa"
-ditto -c -k --keepParent "$stage/Payload" "$stage/SideStore-personal.ipa"
+ditto --norsrc --noextattr --noqtn --noacl -c -k --keepParent "$stage/sidebackup/Payload" "$app/SideBackup.ipa"
+ditto --norsrc --noextattr --noqtn --noacl -c -k --keepParent "$stage/Payload" "$stage/SideStore-personal.ipa"
+# A resource fork named ._Something.appex is interpreted as an app extension
+# by iOS's installer. Check every embedded IPA before publishing the result.
+python3 - "$stage/SideStore-personal.ipa" <<'PY'
+import io
+import sys
+import zipfile
+
+def check(archive):
+    with zipfile.ZipFile(archive) as ipa:
+        for entry in ipa.infolist():
+            if any(part.startswith('._') or part == '__MACOSX' for part in entry.filename.split('/')):
+                raise SystemExit('Refusing IPA containing macOS metadata: ' + entry.filename)
+            if entry.filename.lower().endswith('.ipa'):
+                check(io.BytesIO(ipa.read(entry)))
+
+check(sys.argv[1])
+PY
 mv "$stage/SideStore-personal.ipa" "$work_dir/SideStore-personal.ipa"
 shasum -a 256 "$work_dir/SideStore-personal.ipa"
