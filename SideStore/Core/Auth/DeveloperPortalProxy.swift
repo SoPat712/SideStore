@@ -261,6 +261,7 @@ class DeveloperPortalProxyWithAuth: DeveloperPortalProxy {
             password: password,
             anisetteData: anisetteData,
             xcodeVersion: xcodeVersion,
+            refreshingAnisetteWith: { try await AnisetteProvider.fetch() },
             machinePassword: machinePassword,
             accountRepairHandler: accountRepairHandler,
             verificationHandler: verificationHandler

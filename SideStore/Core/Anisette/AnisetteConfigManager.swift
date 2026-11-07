@@ -168,7 +168,7 @@ public actor AnisetteConfigManager {
     }
 
     public func resolvedXcodeVersion() async -> String {
-        return loadConfig().customXcodeVersion ?? "26.0 (26A242)"
+        return loadConfig().customXcodeVersion ?? SideSign.Constants.GrandSlam.xcodeVersion
     }
     
     public func saveConfig(_ config: AnisetteConfig) {

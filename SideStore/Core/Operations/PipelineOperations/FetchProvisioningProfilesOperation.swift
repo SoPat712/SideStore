@@ -174,6 +174,8 @@ class FetchProvisioningProfilesOperation: BasePipelineOperation<InstallAppOperat
         verboseLog(targetAppBundle.dumpMachOInfo())
         self.debugLog("[FetchProvisioningProfiles] Fetching provisioning profile from Apple for App ID \(groupAppID.bundleIdentifier)...")
         let profile = try await DeveloperPortalProxy.shared.downloadProvisioningProfile(for: groupAppID, deviceType: DeveloperPortalProxy.currentDeviceType, team: team)
+        let requestedEntitlements = targetAppBundle.entitlements.merging(context.additionalEntitlements) { _, additional in additional }
+        try MemoryEntitlementValidation.validate(requested: requestedEntitlements, granted: profile.entitlements)
         self.debugLog("[FetchProvisioningProfiles] Provisioning profile fetched for \(groupAppID.bundleIdentifier) (Name: \(profile.name), Expiration: \(String(describing: profile.expirationDate)))")
         return profile
     }
@@ -269,7 +271,11 @@ private extension FetchProvisioningProfilesOperation{
             let currentValue = currentFeatures[feature] ?? "false"
             return currentValue != targetValue
         }
-        guard needsUpdate else { 
+        // Legacy feature flags do not prove the modern capability is enabled.
+        // Reconfirm it before obtaining the profile used for this installation.
+        let requestsModernMemory = [ALTFeature.increasedMemoryLimit, .extendedVirtualAddressing]
+            .contains { targetFeatures[$0] == "true" }
+        guard needsUpdate || requestsModernMemory else {
             self.debugLog("[FetchProvisioningProfiles] Features for App ID \(appID.bundleIdentifier) are already satisfied. Skipping portal update.")
             return appID 
         }
